@@ -19,18 +19,21 @@ class MercadoLivre(BaseMercadoLivre):
         super().__init__()
         self.nome_planilha = nome_planilha
         self.planilha = pd.read_excel(f'arquivos/{nome_planilha}')
-        self.produtos_encontrados = list()
+        self.produtos_analisados = dict()
     
     @property
     def quantidade_produtos(self):
         tamanho_planilha = len(self.planilha['Nome'])
         return tamanho_planilha
+    
         
     def procurar_produto(self, indice_atual):
         self.indice_atual = indice_atual
         self.nome_produto = self.planilha['Nome'][indice_atual].upper()
+        self.produtos_analisados[self.nome_produto] = dict() # infos de cada produto
+        
         nome_formatado = self.nome_produto.replace(' ', '-')
-        url = f'https://lista.mercadolivre.com.br/{nome_formatado}'
+        url = f'https://lista.mercadolivre.com.br/{nome_formatado}_OrderId_PRICE_NoIndex_True'
         self.driver.get(url)
         sleep(3)
         
@@ -38,21 +41,17 @@ class MercadoLivre(BaseMercadoLivre):
         html = BeautifulSoup(self.driver.page_source, 'html.parser')
         
         try:
-            nome_produto = html.findAll('h2', attrs={'class': 'ui-search-item__title'})
-            preco_produto = html.findAll('span', attrs={'class': 'andes-money-amount ui-search-price__part ui-search-price__part--medium andes-money-amount--cents-superscript'})
-            link_produto = html.findAll('a', attrs={'class': 'ui-search-item__group__element ui-search-link__title-card ui-search-link'})
+            precos = html.findAll('span', attrs={'class': 'andes-money-amount ui-search-price__part ui-search-price__part--medium andes-money-amount--cents-superscript'})
+            links = html.findAll('a', attrs={'class': 'ui-search-item__group__element ui-search-link__title-card ui-search-link'})
         except:
             pass
         
-        for indice, texto_anuncio  in enumerate(nome_produto):
-            texto_anuncio = texto_anuncio.text.upper()
-            compatibilidade_do_texto = fuzz.ratio(texto_anuncio, self.nome_produto)
-            if compatibilidade_do_texto >= 60:
-                preco = self.preco_formatado(preco_produto[indice].text)
-                if preco is not None:
-                    self.link_produto = link_produto[indice]['href']
-                    self.calculadora_lucro(preco)
-    
+        for indice in range(3):
+            if precos is not None:
+                self.produtos_analisados[self.nome_produto][f'Anúncio {indice}'] = dict()
+                self.produtos_analisados[self.nome_produto][f'Anúncio {indice}']['Preço anunciado'] = self.preco_formatado(precos[indice].text)
+                self.produtos_analisados[self.nome_produto][f'Anúncio {indice}']['URL'] = links[indice]['href']
+        
     def preco_formatado(self, preco_desformatado):
         if '.' in preco_desformatado:
             padrao_preco = r'(\d+\.\d+)'
@@ -76,32 +75,38 @@ class MercadoLivre(BaseMercadoLivre):
             
         return float(preco) 
     
-    def calculadora_lucro(self, preco_de_venda):
+    def calculadora_lucro(self):
         preco_planilha = self.planilha['Preço'][self.indice_atual]
         
+        despesas_fixas = 0
+        frete = 10 # Calcular dependendo do peso
         if preco_planilha < 80:
-            custo_fixo = 6
-            porcentagem_ml = 0.15
-            custo_ml = preco_planilha * porcentagem_ml + custo_fixo
-            custo_final = preco_planilha + custo_ml 
-
-        else:
-            porcentagem_ml = 0.15
-            custo_ml = preco_planilha * porcentagem_ml 
-            custo_final = preco_planilha + custo_ml
-        
-        
-        lucro_desejado = 1
-        preco_minimo_venda = lucro_desejado * custo_final
-        
-        if preco_de_venda >= preco_minimo_venda:
-            self.produtos_encontrados.append([self.nome_produto, preco_planilha, custo_ml, preco_de_venda, self.link_produto])
+            despesas_fixas += 6
             
+        despesas_fixas += frete
+
+        imposto = 0.07
+        porcentagem_ml = 0.15
+        lucro_desejado = 0.2
+        
+        valor_minimo_venda = (preco_planilha + despesas_fixas) / (1 - porcentagem_ml - lucro_desejado)
+        
+        menor_preco_anunciado = self.produtos_analisados[self.nome_produto]['Anúncio 0']['Preço anunciado']
+        
+        lucro_condicao_atual  = (menor_preco_anunciado - preco_planilha - despesas_fixas - (menor_preco_anunciado * porcentagem_ml)) / menor_preco_anunciado * 100
+        
+        preco_fornecedor_desejavel = menor_preco_anunciado - despesas_fixas - (menor_preco_anunciado * porcentagem_ml) - (lucro_desejado * menor_preco_anunciado)
+        
+        
+        
+        
+        
     def gerar_planilha(self):
-        df = pd.DataFrame(self.produtos_encontrados, columns=(['Nome', 'Preço de custo', 'Porcentagem ML', 'Preço de venda', 'Link anúncio']))
-        df.to_excel(f'analises/analise_ml_{self.nome_planilha}', index=False)
+        pass
 
+teste = MercadoLivre('teste.xlsx')
+teste.procurar_produto(0)
+teste.conteudo_pagina()
+teste.calculadora_lucro()
 
-# teste = MercadoLivre('teste.xlsx')
-# teste.procurar_produto(0)
-# teste.conteudo_pagina()
+tarifas = 'https://www.mercadolivre.com.br/landing/costos-venta-producto'
