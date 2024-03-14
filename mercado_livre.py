@@ -4,15 +4,33 @@ from time import sleep
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from fuzzywuzzy import fuzz
+from selenium.webdriver.common.by import By
 
 class BaseMercadoLivre:
     def __init__(self):
         self.servico = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=self.servico)
+        self.chrome_option = Options()
+        self.chrome_option.add_extension('arquivos/avantpro.crx')
+        self.driver = webdriver.Chrome(service=self.servico, options=self.chrome_option)
         self.driver.maximize_window()
+        self.login_avant()
 
+    def login_avant(self):
+        self.driver.get('https://www.mercadolivre.com.br/messi-mini-adidas-cor-orange/p/MLB23998590?pdp_filters=official_store:3154#searchVariation=MLB23998590&position=1&search_layout=grid&type=product&tracking_id=2f89f6c1-1177-475b-9695-9485013512dd')
+        while True:
+            botao_link = self.driver.find_element(By.ID, 'openLogin')
+            if botao_link:
+                botao_link.click()
+                sleep(1)
+                break
+            sleep(1)
+            
+        email = self.driver.find_element(By.ID, 'userEmail')
+        email.send_keys('lucascintra97@gmail.com')
+        botao_entrar = self.driver.find_element(By.ID, 'btnSubmitLogin').click()
 
 class MercadoLivre(BaseMercadoLivre):
     def __init__(self, nome_planilha):
@@ -30,22 +48,26 @@ class MercadoLivre(BaseMercadoLivre):
         self.indice_atual = indice_atual
         self.nome_produto = self.planilha['Nome'][indice_atual].upper()
         self.produtos_analisados[self.nome_produto] = dict() # infos de cada produto
+        self.produtos_analisados[self.nome_produto]['menor_preco'] = dict()
+        self.produtos_analisados[self.nome_produto]['mais_relevante'] = dict()
         
     def mais_relevante(self):
         nome_formatado = self.nome_produto.replace(' ', '-')
         url_mais_relevante = f'https://lista.mercadolivre.com.br/{nome_formatado}'
         self.driver.get(url_mais_relevante)
         sleep(3)
-        self.conteudo_pagina()
+        self.conteudo_pesquisa('mais_relevante')
+        self.pagina_produto()
 
     def menor_preco(self):  
         nome_formatado = self.nome_produto.replace(' ', '-')
         url_menor_preco = f'https://lista.mercadolivre.com.br/{nome_formatado}_OrderId_PRICE_NoIndex_True'
         self.driver.get(url_menor_preco)
         sleep(3)
-        self.conteudo_pagina()
+        self.conteudo_pesquisa('menor_preco')
+        
     
-    def conteudo_pagina(self):
+    def conteudo_pesquisa(self, categoria):
         html = BeautifulSoup(self.driver.page_source, 'html.parser')
         
         try:
@@ -56,15 +78,18 @@ class MercadoLivre(BaseMercadoLivre):
         
         for indice in range(3):
             if precos is not None:
-                if self.produtos_analisados[self.nome_produto][f'Preço {indice}']:
-                    self.produtos_analisados[self.nome_produto][f'Preço {indice+3}'] = self.preco_formatado(precos[indice].text)
-                    self.produtos_analisados[self.nome_produto][f'URL {indice+3}'] = links[indice]['href']
-                    
-                else:
-                    self.produtos_analisados[self.nome_produto][f'Preço {indice}'] = self.preco_formatado(precos[indice].text)
-                    self.produtos_analisados[self.nome_produto][f'URL {indice}'] = links[indice]['href']
-        
+                self.produtos_analisados[self.nome_produto][f'{categoria}'][f'Preço {indice}'] = self.preco_formatado(precos[indice].text)
+                self.produtos_analisados[self.nome_produto][f'{categoria}'][f'URL {indice}'] = links[indice]['href']
     
+    def pagina_produto(self):
+        sleep(5)
+        botao = self.driver.find_element(By.ID, 'btnMostrarInfos').click()
+        
+        html = BeautifulSoup(self.driver.page_source, 'html.parser')
+        tudo = html.find('div', attrs={'id', 'productInfo'}).text
+        print()
+        
+        
     def calculadora_lucro(self):
         preco_planilha = self.planilha['Preço'][self.indice_atual]
         menor_preco_anunciado = self.produtos_analisados[self.nome_produto]['Preço 0']
@@ -81,7 +106,7 @@ class MercadoLivre(BaseMercadoLivre):
         despesas_variaveis = imposto + comissao_ml # mudar dependendo da categoria
         lucro_desejado = 0.05
 
-
+        
         # preço minímo para obter o lucro desejado
         valor_minimo_venda = (preco_planilha + despesas_fixas) / (1 - despesas_variaveis - lucro_desejado)
         self.produtos_analisados[self.nome_produto]['Valor minímo venda'] = valor_minimo_venda
@@ -123,7 +148,7 @@ class MercadoLivre(BaseMercadoLivre):
 
 teste = MercadoLivre('teste.xlsx')
 teste.produto(0)
-teste.conteudo_pagina()
-teste.calculadora_lucro()
+teste.mais_relevante()
+teste.menor_preco()
 
 tarifas = 'https://www.mercadolivre.com.br/landing/costos-venta-producto'
