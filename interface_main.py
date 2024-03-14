@@ -14,9 +14,9 @@ class Interface:
     def __init__(self):
         janela = ctk.CTk()
         janela.title('BITHOME')
-        janela.geometry('700x700')
+        janela.geometry('1400x900')
         
-        self.tabview = ctk.CTkTabview(janela, width=700, height=700)
+        self.tabview = ctk.CTkTabview(janela, width=1400, height=900)
         self.tabview.pack()
         
         self.mercado_livre()
@@ -89,11 +89,12 @@ class Interface:
         # imagens
         image = ctk.CTkImage(light_image = Image.open(path_imagem_mercado), size=(500, 100)) # Logo mercado livre
         imagem = ctk.CTkLabel(self.tabview.tab('Mercado Livre'), image=image, text='')
-        imagem.place(x=110, y= 60) 
+        imagem.place(x=410, y= 60) 
         
         image = ctk.CTkImage(light_image = Image.open(path_imagem_excel), size=(50, 50)) # icone excel
         imagem = ctk.CTkLabel(self.tabview.tab('Mercado Livre'), image=image, text='')
         imagem.place(x=570, y=450 )
+        
         
         # Caixa de texto variavel
         self.span_mercado = ctk.CTkLabel(
