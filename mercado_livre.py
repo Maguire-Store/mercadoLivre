@@ -21,16 +21,16 @@ class BaseMercadoLivre:
     def login_avant(self):
         self.driver.get('https://www.mercadolivre.com.br/messi-mini-adidas-cor-orange/p/MLB23998590?pdp_filters=official_store:3154#searchVariation=MLB23998590&position=1&search_layout=grid&type=product&tracking_id=2f89f6c1-1177-475b-9695-9485013512dd')
         while True:
-            botao_link = self.driver.find_element(By.ID, 'openLogin')
-            if botao_link:
-                botao_link.click()
-                sleep(1)
+            try:
+                botao_link = self.driver.find_element(By.ID, 'openLogin').click()
                 break
-            sleep(1)
-            
+            except:
+                sleep(1)
+
         email = self.driver.find_element(By.ID, 'userEmail')
         email.send_keys('lucascintra97@gmail.com')
         botao_entrar = self.driver.find_element(By.ID, 'btnSubmitLogin').click()
+        sleep(3)
 
 class MercadoLivre(BaseMercadoLivre):
     def __init__(self, nome_planilha):
@@ -57,7 +57,7 @@ class MercadoLivre(BaseMercadoLivre):
         self.driver.get(url_mais_relevante)
         sleep(3)
         self.conteudo_pesquisa('mais_relevante')
-        self.pagina_produto()
+        self.pagina_produto('mais_relevante')
 
     def menor_preco(self):  
         nome_formatado = self.nome_produto.replace(' ', '-')
@@ -81,14 +81,39 @@ class MercadoLivre(BaseMercadoLivre):
                 self.produtos_analisados[self.nome_produto][f'{categoria}'][f'Preço {indice}'] = self.preco_formatado(precos[indice].text)
                 self.produtos_analisados[self.nome_produto][f'{categoria}'][f'URL {indice}'] = links[indice]['href']
     
-    def pagina_produto(self):
-        sleep(5)
-        botao = self.driver.find_element(By.ID, 'btnMostrarInfos').click()
+    def pagina_produto(self, categoria):
+        self.driver.get(self.produtos_analisados[self.nome_produto][f'{categoria}'][f'URL 0'])
         
-        html = BeautifulSoup(self.driver.page_source, 'html.parser')
-        tudo = html.find('div', attrs={'id', 'productInfo'}).text
-        print()
+        while True:
+            try:
+                botao = self.driver.find_element(By.ID, 'btnMostrarInfos').click()
+                sleep(1)
+                html = BeautifulSoup(self.driver.page_source, 'html.parser')
+                break
+            except:
+                sleep(1)
+       
+        # preço do frete
+        frete = html.find('div', attrs={'class', 'linha-3'}).text
+        frete = frete.replace(' ', '').replace('\n', '').replace('\t', '').replace('\xa0', '')
         
+        padrao_frete = r'(R\$+\d+\,\d+)'
+        correspondencia = re.search(padrao_frete, frete)
+        frete = correspondencia.group().replace('R$', '').replace(',', '.')
+        self.produtos_analisados[self.nome_produto][f'{categoria}']['Frete'] = float(frete)
+     
+        # Pegas o numero de vendas no Mês
+        atributos = html.findAll('div', attrs={'class', 'details-card'})
+        for atributo in atributos:
+            atributo = atributo.text
+            atributo = atributo.replace(' ', '').replace('\t', '').replace('\n', '')  
+            try:
+                padrao_mes = r'\d+\/Mês'
+                correspondencia = re.search(padrao_mes, atributo)
+                mes = correspondencia.group().replace('/Mês', '')
+                self.produtos_analisados[self.nome_produto][f'{categoria}']['Número vendas'] = int(mes)
+            except:
+                pass
         
     def calculadora_lucro(self):
         preco_planilha = self.planilha['Preço'][self.indice_atual]
