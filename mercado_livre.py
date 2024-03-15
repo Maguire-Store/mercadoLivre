@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+import json
 from time import sleep
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -56,16 +57,18 @@ class MercadoLivre(BaseMercadoLivre):
         url_mais_relevante = f'https://lista.mercadolivre.com.br/{nome_formatado}'
         self.driver.get(url_mais_relevante)
         sleep(3)
-        self.conteudo_pesquisa('mais_relevante')
-        self.pagina_produto('mais_relevante')
-
+        self.conteudo_pesquisa('Mais relevante')
+        self.pagina_produto('Mais relevante')
+        self.calculadora_lucro('Mais relevante')
+        
     def menor_preco(self):  
         nome_formatado = self.nome_produto.replace(' ', '-')
         url_menor_preco = f'https://lista.mercadolivre.com.br/{nome_formatado}_OrderId_PRICE_NoIndex_True'
         self.driver.get(url_menor_preco)
         sleep(3)
-        self.conteudo_pesquisa('menor_preco')
-        
+        self.conteudo_pesquisa('Menor preco')
+        self.pagina_produto('Menor preco')
+        self.calculadora_lucro('Menor preco')
     
     def conteudo_pesquisa(self, categoria):
         html = BeautifulSoup(self.driver.page_source, 'html.parser')
@@ -78,7 +81,7 @@ class MercadoLivre(BaseMercadoLivre):
         
         for indice in range(3):
             if precos is not None:
-                self.produtos_analisados[self.nome_produto][f'{categoria}'][f'Preço {indice}'] = self.preco_formatado(precos[indice].text)
+                self.produtos_analisados[self.nome_produto][f'{categoria}'][f'Preco {indice}'] = self.preco_formatado(precos[indice].text)
                 self.produtos_analisados[self.nome_produto][f'{categoria}'][f'URL {indice}'] = links[indice]['href']
     
     def pagina_produto(self, categoria):
@@ -111,19 +114,19 @@ class MercadoLivre(BaseMercadoLivre):
                 padrao_mes = r'\d+\/Mês'
                 correspondencia = re.search(padrao_mes, atributo)
                 mes = correspondencia.group().replace('/Mês', '')
-                self.produtos_analisados[self.nome_produto][f'{categoria}']['Número vendas'] = int(mes)
+                self.produtos_analisados[self.nome_produto][f'{categoria}']['Numero vendas'] = int(mes)
             except:
                 pass
         
-    def calculadora_lucro(self):
+    def calculadora_lucro(self, categoria):
         preco_planilha = self.planilha['Preço'][self.indice_atual]
-        menor_preco_anunciado = self.produtos_analisados[self.nome_produto]['Preço 0']
+        menor_preco_anunciado = self.produtos_analisados[self.nome_produto][f'{categoria}']['Preco 0']
         
         despesas_fixas = 0
         if menor_preco_anunciado < 80:
             despesas_fixas += 6
             
-        frete = 10 # Calcular dependendo do peso
+        frete = 0 # Calcular dependendo do peso
         despesas_fixas += frete
 
         imposto = 0.07
@@ -134,16 +137,16 @@ class MercadoLivre(BaseMercadoLivre):
         
         # preço minímo para obter o lucro desejado
         valor_minimo_venda = (preco_planilha + despesas_fixas) / (1 - despesas_variaveis - lucro_desejado)
-        self.produtos_analisados[self.nome_produto]['Valor minímo venda'] = valor_minimo_venda
+        self.produtos_analisados[self.nome_produto][f'{categoria}']['Valor minimo venda'] = valor_minimo_venda
         
         # Lucro com as condições atuais
         lucro_condicao_atual  = (menor_preco_anunciado - preco_planilha - despesas_fixas - (menor_preco_anunciado * despesas_variaveis)) / menor_preco_anunciado * 100
-        self.produtos_analisados[self.nome_produto]['Lucro atual'] = lucro_condicao_atual
+        self.produtos_analisados[self.nome_produto][f'{categoria}']['Lucro atual'] = lucro_condicao_atual
         
         # preço que precisa conseguir do fornecedor para obter lucro vendendo com o menor preço anunciado
         preco_fornecedor_desejavel = menor_preco_anunciado - despesas_fixas - (menor_preco_anunciado * despesas_variaveis) - (lucro_desejado * menor_preco_anunciado)
-        self.produtos_analisados[self.nome_produto]['Preço desejável fornecedor'] = preco_fornecedor_desejavel
-        
+        self.produtos_analisados[self.nome_produto][f'{categoria}']['Preco desejavel fornecedor'] = preco_fornecedor_desejavel
+    
     def preco_formatado(self, preco_desformatado):
         if '.' in preco_desformatado:
             padrao_preco = r'(\d+\.\d+)'
@@ -166,14 +169,15 @@ class MercadoLivre(BaseMercadoLivre):
             preco = preco.replace(',', '.')
             
         return float(preco) 
-        
     
-    def gerar_planilha(self):
-        pass
+    def gerar_json(self):
+        with open('produtos_analisados.json', 'w') as f:
+            json.dump(self.produtos_analisados, f, indent=4)
 
-teste = MercadoLivre('teste.xlsx')
-teste.produto(0)
-teste.mais_relevante()
-teste.menor_preco()
+# teste = MercadoLivre('teste.xlsx')
+# teste.produto(0)
+# teste.mais_relevante()
+# teste.menor_preco()
+# teste.gerar_json()
 
 tarifas = 'https://www.mercadolivre.com.br/landing/costos-venta-producto'
