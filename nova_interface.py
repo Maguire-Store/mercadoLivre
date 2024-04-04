@@ -70,7 +70,7 @@ class Interface:
         workbook = openpyxl.load_workbook(filepath)
         sheet = workbook.active
         self.list_values = list(sheet.values)
-        
+        print(self.list_values)
         self.limpar_treeview('nomes_planilha')
         
         self.nomes_planilha.heading(self.list_values[0][0], text=f'{self.list_values[0][0]}' )

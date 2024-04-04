@@ -1,34 +1,31 @@
-import json
-from matplotlib.figure import Figure
+import tkinter as tk
+import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-class Dashboard:
-    def __init__(self, arquivo, janela):
-        self.ler_json(arquivo)
-        self.numero = 0
+# Dados do Produto 1
+labels = ['Preço de Compra', 'Imposto', 'Comissão', 'Lucro R$']
+valores = [168.53, 23.07, 49.42, 88.48]
 
-    def ler_json(self, arquivo):
-        with open(f'{arquivo}', 'r') as f:
-            self.dados = json.load(f)
-    
-    def selecionar_produto(self, numero):
-        self.numero = numero
+# Criar janela
+root = tk.Tk()
+root.title("Indicadores do Produto 1")
 
-    def plotar_grafico(self, categoria):
-        if self.dados[f'Produto {self.numero}'][f'{categoria}']['Lucro'] >= 0:
-            lucro_preju = 'Lucro'
-        
-        else:
-            lucro_preju = 'Prejuízo'
-        
-        frete = self.dados[f'Produto {self.numero}'][f'{categoria}']['Frete'] 
-        comis = self.dados[f'Produto {self.numero}'][f'{categoria}']['Frete'] 
-        frete = self.dados[f'Produto {self.numero}'][f'{categoria}']['Frete'] 
+# Criar Canvas
+canvas = tk.Canvas(root, width=600, height=400)
+canvas.pack()
 
-        
-        labels = [f'{lucro_preju}', 'Frete', 'Comissão', 'Imposto']
-    
-    
-teste = Dashboard('produtos_analisados.json')
-teste.ler_json()
-# teste.estimativa()
+# Criar gráfico de pizza
+fig, ax = plt.subplots()
+wedges, texts, autotexts = ax.pie(valores, labels=labels, autopct='%1.1f%%', startangle=90)
+ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
+ax.set_title('Indicadores do Produto 1')
+
+# Adicionar legenda ao lado do gráfico
+ax.legend(wedges, labels, title="Indicadores:", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+
+# Adicionar gráfico ao Canvas
+canvas = FigureCanvasTkAgg(fig, master=canvas)
+canvas.draw()
+canvas.get_tk_widget().pack()
+
+root.mainloop()

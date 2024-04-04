@@ -5,10 +5,9 @@ from amazon import Amazon
 import customtkinter as ctk
 from mercado_livre import MercadoLivre
 from tkinter.filedialog import askopenfilename
-import json
 import tkinter as tk
 from tkinter import ttk
-import openpyxl
+import pandas as pd
 
 path_imagem_mercado = os.path.join(os.path.dirname(__file__), 'imagens/mercado-livre-logo.png')
 path_imagem_amazon = os.path.join(os.path.dirname(__file__), 'imagens/amazon-logo.png')
@@ -62,8 +61,10 @@ class Interface:
                     break
                 
                 self.progesso_mercado.configure(text=f'Índice atual: {indice_atual+1}')
-                navegador.procurar_produto(indice_atual)
-                navegador.conteudo_pagina()
+                
+                navegador.produto(indice_atual)
+                navegador.pesquisar('mais relevante')
+                navegador.pesquisar('nada')
                 indice_atual += 1
                 
             navegador.gerar_planilha()                   
@@ -83,8 +84,9 @@ class Interface:
                     break
                 self.progesso_amazon.configure(text=f'Índice atual: {indice_atual+1}')
     
-                navegador.procurar_produto(indice_atual)
-                navegador.conteudo_pagina()
+                navegador.produto(indice_atual)
+                navegador.pesquisar('mais relevante')
+                navegador.pesquisar('nada')
                 indice_atual += 1
                 
             navegador.gerar_planilha()
@@ -95,12 +97,11 @@ class Interface:
         self.planilha_amazon = filepath[-1]
         self.span_amazon.configure(text=f'{self.planilha_amazon}')
         
-    def select_file_json(self):
+    def select_file_analise(self):
         filepath = askopenfilename()
         filepath = filepath.split('/')
-        self.dados = self.ler_json(filepath[-1])
-        self.numero = 0
-        self.indicadores_mercado()
+        self.dados_top3 = pd.read_excel(f'analises/{filepath[-1]}', sheet_name='TOP3')
+        self.dados_relevante = pd.read_excel(f'analises/{filepath[-1]}', sheet_name='RELEVANTE')
         
     def mercado_livre(self):
         # adiciona a aba
@@ -157,7 +158,6 @@ class Interface:
         
         scroll.config(command=self.nomes_planilha.yview)
         
-        
         botao_planilha = ttk.Button(frame_esquerda, text='Selecionar arquivo', command=self.load_files, width=32)
         botao_planilha.pack(side='bottom', pady=2, padx=2)
 
@@ -165,42 +165,54 @@ class Interface:
         frame_direita = ttk.LabelFrame(self.tabview.tab('Análises'))
         frame_direita.pack(side='right',padx=10, pady=10)
         
-        self.itens = ttk.Treeview(frame_direita, show="headings", columns=('Indicadores', 'Valores'), height=16, style='mystyle.Treeview')
-        self.itens.column('Indicadores', width=300)
-        self.itens.column('Valores', width=100)
-        self.itens.pack()
-    
+        self.itens_cheap = ttk.Treeview(frame_direita, show="headings", columns=('Indicadores', 'Valores'), height=16, style='mystyle.Treeview')
+        self.itens_cheap.column('Indicadores', width=300)
+        self.itens_cheap.column('Valores', width=100)
+        self.itens_cheap.pack(side='left',padx=10, pady=10)
         
+        self.itens_relevance = ttk.Treeview(frame_direita, show="headings", columns=('Indicadores', 'Valores'), height=16, style='mystyle.Treeview')
+        self.itens_relevance.column('Indicadores', width=300)
+        self.itens_relevance.column('Valores', width=100)
+        self.itens_relevance.pack(side='right',padx=10, pady=10)
+    
         self.nomes_planilha.bind("<<TreeviewSelect>>", self.exibir_informacoes)
         
-        
-    def load_files(self):
-        filepath = askopenfilename()
-        workbook = openpyxl.load_workbook(filepath)
-        sheet = workbook.active
-        self.list_values = list(sheet.values)
-        
-        self.limpar_treeview('nomes_planilha')
-        
-        self.nomes_planilha.heading(self.list_values[0][0], text=f'{self.list_values[0][0]}' )
-        
-        for produto in self.list_values[1:]:
-            self.nomes_planilha.insert('', tk.END, values=produto)
-            
-
     def limpar_treeview(self, nome):
         treeview = getattr(self, nome)
         for item in treeview.get_children():
             treeview.delete(item)
             
+    def load_files(self):
+        self.limpar_treeview('nomes_planilha')
+        self.select_file_analise()
+       
+        self.nomes_planilha.heading('Nome', text='Nome' )
+        for produto in self.dados_top3['Nome']:
+            self.nomes_planilha.insert('', tk.END, values=[produto])
+            
+            
     def exibir_informacoes(self, event):
         item_selecionado = self.nomes_planilha.focus()
-        indice = self.nomes_planilha.item(item_selecionado)
-        
-        self.limpar_treeview('itens')  # Limpa a Treeview de itens
+        item_selecionado = self.nomes_planilha.item(item_selecionado)['values'][0]
 
-        for atributo, linha in enumerate(self.list_values[0][1:]):
-            self.itens.insert('', tk.END, values=(linha, indice['values'][atributo+1]))
+        self.limpar_treeview('itens_cheap')  # Limpa a Treeview de itens
+        self.limpar_treeview('itens_relevance')  # Limpa a Treeview de itens
+        self.itens_cheap.heading('Indicadores', text='TOP 3' )
+        self.itens_relevance.heading('Indicadores', text='RELEVANTE' )
+
+        for numero, produto in enumerate(self.dados_top3['Nome']):
+            if produto == item_selecionado:
+                for categoria in self.dados_top3:
+                    if categoria == 'Nome':
+                        continue
+                    self.itens_cheap.insert('', tk.END, values=(categoria, self.dados_top3[f'{categoria}'][numero]))
+                    
+        for numero, produto in enumerate(self.dados_relevante['Nome']):
+            if produto == item_selecionado:
+                for categoria in self.dados_relevante:
+                    if categoria == 'Nome':
+                        continue
+                    self.itens_relevance.insert('', tk.END, values=(categoria, self.dados_relevante[f'{categoria}'][numero]))
         
         
     def amazon(self):
@@ -235,12 +247,6 @@ class Interface:
 
         # quantidade de produtos
         self.quantidade_produtos_amazon = ctk.CTkLabel(self.tabview.tab('Amazon'), text='Quantidade produtos: 0', text_color='Black', fg_color='white', corner_radius=10, width=50, height=50, font=('Arial',16))
-        self.quantidade_produtos_amazon.place(x=150, y=250)
-    
-    
-    def ler_json(self, nome):
-        with open(f'json/{nome}', 'r') as f:
-            return json.load(f)
-        
+        self.quantidade_produtos_amazon.place(x=150, y=250)  
         
 teste = Interface()
