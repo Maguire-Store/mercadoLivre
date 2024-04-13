@@ -3,9 +3,11 @@ import threading
 from PIL import Image
 from amazon import Amazon
 import customtkinter as ctk
-from mercado_livre import MercadoLivre
+from mercado import MercadoLivre
 from tkinter.filedialog import askopenfilename
 import tkinter as tk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import ttk
 import pandas as pd
 
@@ -142,39 +144,31 @@ class Interface:
     def analises(self):
         self.tabview.add('Análises')
         self.tabview.tab('Análises').configure(fg_color='#5C5A51')
-        
+
         frame_esquerda = ttk.LabelFrame(self.tabview.tab('Análises'), text='Planilha: ')
         frame_esquerda.pack(side='left', padx=10, pady=10)
-        
+
         frame_planilha =  ttk.LabelFrame(frame_esquerda)
         frame_planilha.pack(side='top')
-        
-        scroll = ttk.Scrollbar(frame_planilha)  
+
+        scroll = ttk.Scrollbar(frame_planilha)
         scroll.pack(side='right', fill='y')
-        
+
         self.nomes_planilha = ttk.Treeview(frame_planilha, show="headings",height=14, columns=('Nome'), yscrollcommand=scroll.set, style='mystyle.Treeview')
         self.nomes_planilha.pack()
         self.nomes_planilha.column('Nome', width=700)
-        
+
         scroll.config(command=self.nomes_planilha.yview)
-        
+
         botao_planilha = ttk.Button(frame_esquerda, text='Selecionar arquivo', command=self.load_files, width=32)
         botao_planilha.pack(side='bottom', pady=2, padx=2)
 
-        
         frame_direita = ttk.LabelFrame(self.tabview.tab('Análises'))
         frame_direita.pack(side='right',padx=10, pady=10)
-        
-        self.itens_cheap = ttk.Treeview(frame_direita, show="headings", columns=('Indicadores', 'Valores'), height=16, style='mystyle.Treeview')
-        self.itens_cheap.column('Indicadores', width=300)
-        self.itens_cheap.column('Valores', width=100)
-        self.itens_cheap.pack(side='left',padx=10, pady=10)
-        
-        self.itens_relevance = ttk.Treeview(frame_direita, show="headings", columns=('Indicadores', 'Valores'), height=16, style='mystyle.Treeview')
-        self.itens_relevance.column('Indicadores', width=300)
-        self.itens_relevance.column('Valores', width=100)
-        self.itens_relevance.pack(side='right',padx=10, pady=10)
-    
+
+        self.canvas_grafico = tk.Canvas(frame_direita,  width=600, height=400)
+        self.canvas_grafico.pack()
+
         self.nomes_planilha.bind("<<TreeviewSelect>>", self.exibir_informacoes)
         
     def limpar_treeview(self, nome):
@@ -195,25 +189,36 @@ class Interface:
         item_selecionado = self.nomes_planilha.focus()
         item_selecionado = self.nomes_planilha.item(item_selecionado)['values'][0]
 
-        self.limpar_treeview('itens_cheap')  # Limpa a Treeview de itens
-        self.limpar_treeview('itens_relevance')  # Limpa a Treeview de itens
-        self.itens_cheap.heading('Indicadores', text='TOP 3' )
-        self.itens_relevance.heading('Indicadores', text='RELEVANTE' )
+        labels = ['Preço de Compra', 'Imposto', 'Comissão', 'Lucro R$']
 
         for numero, produto in enumerate(self.dados_top3['Nome']):
             if produto == item_selecionado:
-                for categoria in self.dados_top3:
-                    if categoria == 'Nome':
-                        continue
-                    self.itens_cheap.insert('', tk.END, values=(categoria, self.dados_top3[f'{categoria}'][numero]))
-                    
-        for numero, produto in enumerate(self.dados_relevante['Nome']):
-            if produto == item_selecionado:
-                for categoria in self.dados_relevante:
-                    if categoria == 'Nome':
-                        continue
-                    self.itens_relevance.insert('', tk.END, values=(categoria, self.dados_relevante[f'{categoria}'][numero]))
+                valores = [
+                    self.dados_top3['Preço de compra'][numero],
+                    self.dados_top3['Imposto'][numero],
+                    self.dados_top3['Comissão'][numero],
+                    self.dados_top3['Lucro R$'][numero],
+                ]
+
+        # Limpar o gráfico anterior, se existir
+        if hasattr(self, 'fig'):
+            self.ax.clear()
+
+        # Criar o gráfico de pizza
+        self.fig, self.ax = plt.subplots()
+        wedges, texts, autotexts = self.ax.pie(valores, autopct='%1.1f%%', startangle=90)
+        self.ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle
         
+        self.ax.legend(wedges, labels, title="Indicadores:", loc="center left", bbox_to_anchor=(0.75, -0.47, 0.5, 1))
+
+        # Adicionar gráfico ao Canvas
+        self.canvas_grafico = FigureCanvasTkAgg(self.fig, master=self.canvas_grafico)
+        self.canvas_grafico.draw()
+        self.canvas_grafico.get_tk_widget().pack()
+
+
+        
+                        
         
     def amazon(self):
         self.tabview.add('Amazon')
