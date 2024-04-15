@@ -72,12 +72,10 @@ class MercadoLivre(BaseMercadoLivre):
         # 'Visitas pro venda': [], 
          
     def gerar_planilha(self):
-        df1 = pd.DataFrame(self.mais_baratos)
-        df2 = pd.DataFrame(self.relevantes)
         # Escrever o DataFrame em um arquivo Excel
         with pd.ExcelWriter(f'analises/analise-{self.nome_excel}-mercado.xlsx') as writer:
-            df1.to_excel(writer, sheet_name='TOP3', index=False)
-            df2.to_excel(writer, sheet_name='RELEVANTEs', index=False)
+            self.mais_baratos.to_excel(writer, sheet_name='TOP3', index=False)
+            self.relevantes.to_excel(writer, sheet_name='RELEVANTES', index=False)
         
     def tirar_virgula(self, preco):
         # tirar a virgula e colocar um ponto para transformar em float
@@ -228,15 +226,14 @@ class MercadoLivre(BaseMercadoLivre):
         
     def produto(self):
         # Caracteristicas do produto atual
-        self.nome_produto = self.planilha['Nome'][self.indice_atual].upper() # Nome do produto
-        self.preco_fornecedor = self.tirar_virgula(str(self.planilha['Preço'][self.indice_atual])) # Preço do fornecedor
-        
+
         while self.indice_atual != self.tamanho_plan: # Enquanto não terminar a lista ele não procura
+            self.nome_produto = self.planilha['Nome'][self.indice_atual].upper() # Nome do produto
+            self.preco_fornecedor = self.tirar_virgula(str(self.planilha['Preço'][self.indice_atual])) # Preço do fornecedor
             self.executar_mais_baratos()
             self.executar_relevantes()
             self.gerar_planilha() # gera a planilha a cada loop para se travar não perder todo o progresso
             self.indice_atual += 1 # passa para o próximo produto
-    
     
     # def pagina_produto(self, categoria):
     #     self.driver.get(self.link)
@@ -273,3 +270,6 @@ class MercadoLivre(BaseMercadoLivre):
     #     frete = correspondencia.group().replace('R$', '').replace(',', '.')
     #     self.produtos_analisados['Frete'] = float(frete)
     
+
+# teste = MercadoLivre('teste.xlsx')
+# teste.produto()

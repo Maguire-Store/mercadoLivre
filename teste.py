@@ -1,8 +1,10 @@
-preco = 0
-preco1 = 0
-preco2 = 0
-preco3 = 0
+from fuzzywuzzy import fuzz
 
+# Strings de exemplo
+string1 = "Python is awesome"
+string2 = "Python is awesome"
 
-for indice in range(3):
-    preco[indice] = indice
+# Calcular a porcentagem de similaridade
+porcentagem = fuzz.ratio(string1, string2)
+
+print(f"A porcentagem de similaridade entre as strings é: {porcentagem}%")
